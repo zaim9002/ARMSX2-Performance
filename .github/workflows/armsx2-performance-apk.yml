@@ -8,53 +8,49 @@ on:
 
 jobs:
   build:
-    name: Build ARMSX2 APK
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Rust
+      - name: Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
 
-      - name: Setup Android SDK PATH
-        run: |
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          echo "$ANDROID_HOME/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
-          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-          echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Check Android SDK
+      - name: Install Android dependencies
         run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
+          sdkmanager "ndk;28.2.13676358"
+          sdkmanager "cmake;3.31.6"
+
+      - name: Prepare
+        run: |
+          chmod +x platforms/android/gradlew
           echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          which sdkmanager || true
-          sdkmanager --version
-          adb version
-
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Make Gradle executable
-        run: chmod +x platforms/android/gradlew
+          java -version
+          ./platforms/android/gradlew --version
 
       - name: Build APK
         working-directory: platforms/android
-        run: ./gradlew assembleGithubRelease --no-daemon --stacktrace
+        run: |
+          ./gradlew assembleGithubRelease --no-daemon --stacktrace
 
       - name: Find APK
-        run: find platforms/android -type f -name "*.apk" -print
+        run: |
+          find platforms/android -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
